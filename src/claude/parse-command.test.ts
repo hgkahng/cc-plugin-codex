@@ -3,26 +3,23 @@ import { describe, expect, it } from 'vitest';
 const load = () => import('../../claude/scripts/lib/parse-command.mjs');
 
 describe('parseCommand', () => {
-  it('parses review flags and trailing text', async () => {
+  it('parses background delegate flags and trailing text', async () => {
     const { parseCommand } = await load();
 
     expect(
-      parseCommand(['review', '--base', 'main', '--model', 'sonnet', 'focus on race conditions']),
+      parseCommand(['delegate', '--background', '--model', 'sonnet', 'fix the flaky test']),
     ).toEqual({
-      command: 'review',
+      command: 'delegate',
       flags: {
-        background: false,
-        base: 'main',
+        background: true,
         model: 'sonnet',
         effort: undefined,
         resume: false,
         fresh: false,
         job: undefined,
         json: false,
-        enableReviewGate: false,
-        disableReviewGate: false,
       },
-      trailingText: 'focus on race conditions',
+      trailingText: 'fix the flaky test',
     });
   });
 

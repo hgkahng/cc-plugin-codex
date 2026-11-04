@@ -1,47 +1,18 @@
 #!/usr/bin/env node
 import { cwd } from 'node:process';
 import { closeSync, openSync } from 'node:fs';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { parseCommand } from './lib/parse-command.mjs';
-import { loadRuntimeConfig, saveRuntimeConfig, getStateRoot } from './lib/runtime-config.mjs';
-import { probeClaude, runClaudeJson, parseClaudeEnvelope, withClaudeVersionHint } from './lib/claude-process.mjs';
-import { runSetup } from './lib/operations/setup.mjs';
+import { loadRuntimeConfig, getStateRoot } from './lib/runtime-config.mjs';
 import { runStatus, runResult, runCancel } from './lib/operations/jobs.mjs';
-import { runReview } from './lib/operations/review.mjs';
-import { runRescue, runRescueCore } from './lib/operations/rescue.mjs';
+import { runDelegate, runDelegateCore } from './lib/operations/delegate.mjs';
 import { createJob, listJobs, updateJob } from './lib/jobs-store.mjs';
-import { resolveReviewTarget } from './lib/git-review-target.mjs';
-import { buildReviewContext } from './lib/review-context.mjs';
-import { renderReviewOutput } from './lib/render-output.mjs';
-import { pluginPath, scriptsDir } from './lib/plugin-paths.mjs';
+import { scriptsDir } from './lib/plugin-paths.mjs';
 
 function printLine(value) {
   process.stdout.write(value.endsWith('\n') ? value : `${value}\n`);
-}
-
-async function runClaudeReview({ prompt, context, model, effort }) {
-  const schema = await readFile(pluginPath('schemas', 'review-findings.schema.json'), 'utf8');
-  const args = ['--model', model, '--json-schema', schema];
-  if (effort) {
-    args.push('--effort', effort);
-  }
-  const commandResult = await runClaudeJson(`${prompt}\n\n${context}`, args, process.env);
-  if (commandResult.error) {
-    throw new Error(`Claude review failed: ${commandResult.error.message}`);
-  }
-  if (commandResult.stdout.trim() === '') {
-    throw new Error(withClaudeVersionHint(commandResult.stderr.trim()) || 'Claude review returned no output.');
-  }
-  const envelope = parseClaudeEnvelope(commandResult.stdout);
-  if (envelope.isError) {
-    throw new Error(envelope.result);
-  }
-  return {
-    rawOutput: envelope.result,
-    parsedPayload: JSON.parse(envelope.result),
-  };
 }
 
 async function spawnBackgroundWorker(jobId, parsed, logFilePath) {
@@ -82,14 +53,9 @@ async function main(argv = process.argv.slice(2)) {
     config,
     stateRoot,
     workspaceRoot: cwd(),
-    probeClaude,
-    saveConfig: (nextConfig) => saveRuntimeConfig(nextConfig),
     env: process.env,
-    resolveReviewTarget,
-    buildReviewContext,
-    runClaudeReview,
-    runRescueCore: (nextParsed, sessionId) =>
-      runRescueCore(
+    runDelegateCore: (nextParsed, sessionId) =>
+      runDelegateCore(
         {
           ...nextParsed,
           flags: {
@@ -105,14 +71,10 @@ async function main(argv = process.argv.slice(2)) {
     listJobs,
     updateJob,
     spawnBackgroundWorker,
-    renderReviewOutput,
   };
 
   let result;
   switch (parsed.command) {
-    case 'setup':
-      result = await runSetup(parsed, deps);
-      break;
     case 'status':
       result = await runStatus(parsed, deps);
       break;
@@ -122,16 +84,11 @@ async function main(argv = process.argv.slice(2)) {
     case 'cancel':
       result = await runCancel(parsed, deps);
       break;
-    case 'review':
-    case 'adversarial-review':
-      result = await runReview(parsed, deps);
-      break;
     case 'delegate':
-    case 'rescue':
-      result = await runRescue(parsed, deps);
+      result = await runDelegate(parsed, deps);
       break;
     default:
-      throw new Error(`Command not wired yet: ${parsed.command}`);
+      throw new Error(`Unknown command: ${parsed.command}. Expected one of: delegate, status, result, cancel.`);
   }
 
   printLine(parsed.flags.json ? JSON.stringify(result, null, 2) : result.output);

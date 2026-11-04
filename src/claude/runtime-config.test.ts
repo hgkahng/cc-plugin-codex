@@ -1,38 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const load = () => import('../../claude/scripts/lib/runtime-config.mjs');
 
 describe('runtime config', () => {
-  it('defaults to opus, high effort, and a blocked gate capability', async () => {
+  it('defaults to opus and high effort', async () => {
     const root = mkdtempSync(join(tmpdir(), 'claude-companion-config-'));
     const { loadRuntimeConfig } = await load();
 
     const config = await loadRuntimeConfig({ CLAUDE_COMPANION_STATE_ROOT: root });
 
-    expect(config.defaultModel).toBe('opus');
-    expect(config.defaultEffort).toBe('high');
-    expect(config.reviewGate.capability).toBe('blocked');
+    expect(config).toEqual({ defaultModel: 'opus', defaultEffort: 'high' });
   });
 
-  it('persists config updates to config.json', async () => {
+  it('reads hand-edited defaults from config.json', async () => {
     const root = mkdtempSync(join(tmpdir(), 'claude-companion-config-'));
-    const { loadRuntimeConfig, saveRuntimeConfig, getConfigPath } = await load();
+    const { loadRuntimeConfig, getConfigPath } = await load();
+    mkdirSync(root, { recursive: true });
+    writeFileSync(getConfigPath({ CLAUDE_COMPANION_STATE_ROOT: root }), JSON.stringify({ defaultModel: 'sonnet' }));
 
-    const current = await loadRuntimeConfig({ CLAUDE_COMPANION_STATE_ROOT: root });
-    await saveRuntimeConfig(
-      {
-        ...current,
-        defaultModel: 'claude-sonnet-4-6',
-        reviewGate: { ...current.reviewGate, desiredState: 'enabled' },
-      },
-      { CLAUDE_COMPANION_STATE_ROOT: root },
-    );
+    const config = await loadRuntimeConfig({ CLAUDE_COMPANION_STATE_ROOT: root });
 
-    const stored = JSON.parse(readFileSync(getConfigPath({ CLAUDE_COMPANION_STATE_ROOT: root }), 'utf8'));
-    expect(stored.defaultModel).toBe('claude-sonnet-4-6');
-    expect(stored.reviewGate.desiredState).toBe('enabled');
+    expect(config).toEqual({ defaultModel: 'sonnet', defaultEffort: 'high' });
   });
 });

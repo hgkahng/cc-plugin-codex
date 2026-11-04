@@ -256,13 +256,9 @@ describe('plugin install contract', () => {
               ]),
           ),
         ).toEqual({
-          'claude-companion:claude-adversarial-review': 'Adversarial Review',
           'claude-companion:claude-cancel': 'Cancel',
           'claude-companion:claude-delegate': 'Delegate',
-          'claude-companion:claude-rescue': 'Rescue',
           'claude-companion:claude-result': 'Result',
-          'claude-companion:claude-review': 'Review',
-          'claude-companion:claude-setup': 'Setup',
           'claude-companion:claude-status': 'Status',
         });
       } finally {

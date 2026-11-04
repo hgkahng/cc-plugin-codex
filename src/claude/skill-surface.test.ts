@@ -2,14 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 
 const skills = new Map([
-  ['claude-review', 'review'],
-  ['claude-adversarial-review', 'adversarial-review'],
   ['claude-delegate', 'delegate'],
-  ['claude-rescue', 'rescue'],
   ['claude-status', 'status'],
   ['claude-result', 'result'],
   ['claude-cancel', 'cancel'],
-  ['claude-setup', 'setup'],
 ]);
 
 describe('claude skill surface', () => {
@@ -23,10 +19,5 @@ describe('claude skill surface', () => {
       expect(contents).not.toContain('node claude/scripts/claude-companion.mjs');
       expect(contents).toContain('Do not implement logic in this skill');
     }
-  });
-
-  it('documents the blocked automatic review gate honestly', () => {
-    const readme = readFileSync('claude/README.md', 'utf8');
-    expect(readme).toContain('automatic stop-time review gate is currently unavailable/blocked in the Codex plugin runtime');
   });
 });

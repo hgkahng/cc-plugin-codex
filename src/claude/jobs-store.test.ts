@@ -11,9 +11,9 @@ describe('jobs store', () => {
     const { createJob, listJobs } = await load();
 
     const created = await createJob(root, '/repo/example', {
-      kind: 'rescue',
+      kind: 'delegate',
       title: 'Investigate test failures',
-      summary: 'Foreground rescue run',
+      summary: 'Foreground delegate run',
       status: 'queued',
       phase: 'queued',
     });
@@ -23,9 +23,9 @@ describe('jobs store', () => {
     expect(jobs).toHaveLength(1);
     expect(jobs[0]).toMatchObject({
       id: created.id,
-      kind: 'rescue',
+      kind: 'delegate',
       title: 'Investigate test failures',
-      summary: 'Foreground rescue run',
+      summary: 'Foreground delegate run',
       workspaceRoot: '/repo/example',
       status: 'queued',
       phase: 'queued',
@@ -45,12 +45,12 @@ describe('jobs store', () => {
     const { createJob, listJobs } = await load();
 
     await createJob(root, '/repo/example', {
-      kind: 'review',
+      kind: 'delegate',
       title: 'Review current diff',
       summary: '2 findings',
       status: 'completed',
       phase: 'completed',
-      renderedOutput: 'Claude review found 2 issues.',
+      renderedOutput: 'Delegate finished.',
     });
 
     const workspaceDir = join(root, 'workspaces', readdirSync(join(root, 'workspaces'))[0]);
@@ -59,7 +59,7 @@ describe('jobs store', () => {
       join(jobsDir, 'orphan.json'),
       JSON.stringify({
         id: 'orphan',
-        kind: 'review',
+        kind: 'delegate',
         title: 'Stray file',
         summary: 'Should not be indexed',
         workspaceRoot: '/repo/example',
@@ -139,8 +139,8 @@ describe('jobs store', () => {
     const { createJob, readJob, updateJob } = await load();
 
     const job = await createJob(root, '/repo/example', {
-      kind: 'rescue',
-      title: 'Stalled background rescue',
+      kind: 'delegate',
+      title: 'Stalled background delegate',
       summary: 'Waiting on stale lock recovery',
       status: 'running',
       phase: 'running',

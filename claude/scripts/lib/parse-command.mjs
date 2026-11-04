@@ -1,11 +1,9 @@
-const STRING_FLAGS = new Set(['--base', '--model', '--effort', '--job']);
+const STRING_FLAGS = new Set(['--model', '--effort', '--job']);
 const BOOLEAN_FLAGS = new Map([
   ['--background', 'background'],
   ['--resume', 'resume'],
   ['--fresh', 'fresh'],
   ['--json', 'json'],
-  ['--enable-review-gate', 'enableReviewGate'],
-  ['--disable-review-gate', 'disableReviewGate'],
 ]);
 
 const SUPPORTED_FLAGS = [...STRING_FLAGS, ...BOOLEAN_FLAGS.keys()].join(', ');
@@ -15,21 +13,18 @@ export function parseCommand(argv) {
 
   if (!command) {
     throw new Error(
-      'Missing command. Expected one of: setup, review, adversarial-review, delegate, rescue, status, result, cancel.',
+      'Missing command. Expected one of: delegate, status, result, cancel.',
     );
   }
 
   const flags = {
     background: false,
-    base: undefined,
     model: undefined,
     effort: undefined,
     resume: false,
     fresh: false,
     job: undefined,
     json: false,
-    enableReviewGate: false,
-    disableReviewGate: false,
   };
 
   const trailing = [];

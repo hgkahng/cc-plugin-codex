@@ -1,146 +1,67 @@
-# CC Plugin Codex
+# CC Plugin Codex (lean fork)
 
-<img width="2626" height="2212" alt="CleanShot 2026-04-01 at 12 20 56@2x" src="https://github.com/user-attachments/assets/f8b6eb0d-e54e-439f-9e30-6444daffdc69" />
+Delegate tasks from Codex to your local Claude Code.
 
+This is a trimmed fork of [`pejmanjohn/cc-plugin-codex`](https://github.com/pejmanjohn/cc-plugin-codex). It keeps delegation and background jobs, removes the review, rescue, and setup skills, and raises the run time limit from 30 minutes to 4 hours.
 
-Use Claude from inside Codex for code reviews or to delegate tasks to Claude Code.
+## Skills
 
-This repository is the source for the Codex-native Claude Companion plugin bundle. It is meant to be a reverse port of [`openai/codex-plugin-cc`](https://github.com/openai/codex-plugin-cc): the original brings Codex into Claude Code, while this project brings Claude-backed review and delegation workflows into Codex.
-
-The installable plugin bundle lives under [`claude/README.md`](./claude/README.md).
-
-## What You Get
-
-- `$claude-review` for a normal read-only Claude review from Codex
-- `$claude-adversarial-review` for a steerable challenge review
-- `$claude-delegate`, `$claude-status`, `$claude-result`, and `$claude-cancel` to delegate and manage longer-running Claude tasks
-- `$claude-rescue` as a backwards-compatible alias for `$claude-delegate`
-- `$claude-setup` to verify Claude Code readiness and report the current review-gate limitation honestly
+| Skill | Use |
+|---|---|
+| `$claude-delegate` | Send a task to Claude Code, in the foreground or with `--background` |
+| `$claude-status` | List jobs for the current workspace |
+| `$claude-result --job <id>` | Print a job's stored output |
+| `$claude-cancel --job <id>` | Stop a running background job |
 
 ## Requirements
 
-- Codex with plugin support and the `codex` CLI available on `PATH`
-- Claude Code installed and available as `claude`
-- Node.js 18.18 or later available as `node`
+- Codex with plugin support, and `codex` on `PATH`
+- Claude Code installed and signed in, as `claude`
+- Node.js 18.18 or later
 
 ## Install
 
 ```bash
-codex plugin marketplace add pejmanjohn/cc-plugin-codex
+codex plugin marketplace add hgkahng/cc-plugin-codex
 codex plugin add claude-companion@cc-plugin-codex-marketplace
 ```
 
-This uses Codex's normal plugin marketplace flow directly from GitHub. No repo-local installer or machine-specific paths are required.
+Restart Codex (or the Codex app), then start a new thread.
 
-## Verify
+To update, run `codex plugin marketplace upgrade cc-plugin-codex-marketplace`, repeat `codex plugin add`, and start a new thread. To uninstall, run `codex plugin remove claude-companion@cc-plugin-codex-marketplace` and `codex plugin marketplace remove cc-plugin-codex-marketplace`.
 
-Open Codex:
-
-```bash
-codex
-```
-
-If you normally use the Codex Mac app and it is already open, restart it instead.
-
-Then start a new thread and run:
-
-```text
-$claude-setup
-```
-
-After install, you should see the bundled Claude Companion skills in Codex. The full bundle-level usage guide lives in [`claude/README.md`](./claude/README.md).
-
-## Update
-
-```bash
-codex plugin marketplace upgrade cc-plugin-codex-marketplace
-codex plugin add claude-companion@cc-plugin-codex-marketplace
-```
-
-Start a new Codex thread after reinstalling so the updated skills are loaded.
-
-## Uninstall
-
-```bash
-codex plugin remove claude-companion@cc-plugin-codex-marketplace
-codex plugin marketplace remove cc-plugin-codex-marketplace
-```
-
-The first command removes the installed plugin. The second removes the GitHub marketplace source from Codex.
-
-## Usage
-
-### `$claude-review`
-
-Runs a normal read-only Claude review on your current work or against a base ref. Supports `--base <ref>`, `--model <alias>`, and `--effort <level>`. Reviews cover uncommitted changes including untracked files; `--base` requires a clean worktree because it compares committed history.
-
-### `$claude-adversarial-review`
-
-Runs a more skeptical review that questions implementation choices, tradeoffs, and failure modes.
-
-### `$claude-delegate`
-
-Delegates a foreground or background task to Claude and stores durable job state for follow-up.
-
-By default, delegation uses Claude Code model `opus` with effort `high`.
+## Delegate
 
 ```text
 $claude-delegate investigate the flaky checkout test
+$claude-delegate --background --effort xhigh implement the retry fix
+$claude-delegate --resume now add a test for it
 ```
 
-Override the model or effort level per task:
+| Flag | Effect |
+|---|---|
+| `--background` | Return a job id at once; check it with `$claude-status` and `$claude-result` |
+| `--model <alias>` | Claude model, such as `opus` (default) or `sonnet` |
+| `--effort <level>` | `low`, `medium`, `high` (default), `xhigh`, or `max` |
+| `--resume` | Continue the latest Claude session started from this Codex thread |
+| `--fresh` | Start a new Claude session |
+| `--json` | Print the full job record as JSON |
 
-```text
-$claude-delegate --model sonnet --effort medium investigate the flaky checkout test
-$claude-delegate --background --model opus --effort xhigh implement the retry fix
-```
+Use `--background` for long tasks, so Codex does not wait on one long shell command.
 
-Persist new defaults with setup:
+Each run is `claude -p --output-format json` in the current workspace. Claude loads your usual setup (CLAUDE.md, skills, plugins, MCP servers) and uses your Claude Code permission settings. With no `permissions.defaultMode` set, a `claude -p` run denies anything that needs approval, so Claude can read files but not edit them.
 
-```text
-$claude-setup --model opus --effort high
-```
+## Settings
 
-Claude Code currently accepts effort levels such as `low`, `medium`, `high`, `xhigh`, and `max`. Model values can be aliases such as `sonnet` or `opus`, or full Claude model names supported by your Claude Code installation.
+| Setting | Where | Default |
+|---|---|---|
+| Run time limit | `CLAUDE_COMPANION_TIMEOUT_MS` environment variable | 4 hours |
+| Default model and effort | `~/.codex/claude-companion/config.json`, for example `{"defaultModel": "sonnet", "defaultEffort": "medium"}` | `opus`, `high` |
+| Job records and output | `~/.codex/claude-companion/workspaces/` (or `CLAUDE_COMPANION_STATE_ROOT`) | |
 
-`--resume` continues the most recent delegate thread started from the same Codex conversation (Codex exposes a `CODEX_THREAD_ID` to plugin commands). When no thread id is available, it falls back to the workspace's most recent delegate thread.
+## If Codex blocks the delegate command
 
-`$claude-rescue` remains available as a backwards-compatible alias.
-
-### `$claude-status`, `$claude-result`, `$claude-cancel`
-
-Shows running and recent jobs, returns the stored final output, or cancels an active background task.
-
-### `$claude-setup`
-
-Checks whether Claude Code is installed and signed in (via local `claude auth status`, no API call; older Claude Code versions fall back to a one-prompt live probe), and reports the current stop-time review-gate limitation.
-
-## Current Limitation
-
-The plugin is usable today, but it is not fully functionally equivalent to `openai/codex-plugin-cc`.
-
-The missing piece is the automatic stop-time review gate. Codex supports repo-level and user-level hooks, but validated installed-plugin runs still did not execute bundled plugin hooks after official install, so this plugin reports that limitation honestly instead of pretending the gate works.
-
-## Troubleshooting
-
-### Codex blocks `$claude-delegate` as data exfiltration
-
-Codex may refuse to launch the delegate command with a message like "this delegates repository context to an external service". Two things to know:
-
-- **What data goes where.** Delegation runs your locally installed Claude Code CLI under your own Anthropic account. Workspace context is sent to Anthropic's API exactly as if you ran `claude` in your own terminal. There is no third-party or plugin-operated service involved (see [PRIVACY.md](./PRIVACY.md)).
-- **Who decides.** The approval layer belongs to Codex, not to this plugin. The plugin cannot and will not bypass it. If Codex denies the command after you approve it, that is a Codex-side policy decision to raise with OpenAI.
-
-One known aggravator: Codex sometimes invents Claude Code CLI flags — most commonly `--dangerously-skip-permissions` — when composing the command, which makes an ordinary delegation look like a safety bypass to the approval layer. This plugin never uses that flag; the skill instructions now list the supported flags explicitly, and `claude-companion.mjs` rejects unknown flags with an error instead of passing them along. If you see a rejection quoting a flag not documented above, retry the skill — the corrected command usually passes review.
-
-## Releases
-
-This repo uses simple tag-based releases.
-
-- Keep [`package.json`](./package.json) and [`claude/.codex-plugin/plugin.json`](./claude/.codex-plugin/plugin.json) on the same semantic version.
-- Create a tag like `v0.1.0`.
-- Push the tag to GitHub.
-
-The release workflow will verify the tag matches both version files, run the Claude plugin test suite, and publish a GitHub release with generated notes.
+Codex may refuse to run it as "delegating repository context to an external service". The command runs your own `claude` under your own Anthropic account, the same as running `claude` in a terminal. The decision belongs to Codex's approval layer. The plugin rejects unknown flags, so a command where Codex added a flag such as `--dangerously-skip-permissions` fails; retry the skill.
 
 ## Development
 
@@ -149,14 +70,4 @@ npm ci
 npm run test:claude
 ```
 
-Helpful files:
-
-- [`claude/README.md`](./claude/README.md)
-- [`claude/.codex-plugin/plugin.json`](./claude/.codex-plugin/plugin.json)
-
-For local development, add this checkout as a local marketplace instead of using the GitHub source:
-
-```bash
-codex plugin marketplace add /path/to/cc-plugin-codex
-codex plugin add claude-companion@cc-plugin-codex-marketplace
-```
+To test a local checkout, add it as the marketplace instead: `codex plugin marketplace add /path/to/cc-plugin-codex`.

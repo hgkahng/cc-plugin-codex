@@ -16,12 +16,12 @@ describe('jobs operations', () => {
     const { runStatus } = await loadJobs();
 
     const job = await createJob(root, '/repo/example', {
-      kind: 'review',
+      kind: 'delegate',
       title: 'Review current diff',
       summary: '2 findings',
       status: 'completed',
       phase: 'completed',
-      renderedOutput: 'Claude review found 2 issues.',
+      renderedOutput: 'Delegate finished.',
     });
 
     const workspaceDir = join(root, 'workspaces', readdirSync(join(root, 'workspaces'))[0]);
@@ -30,7 +30,7 @@ describe('jobs operations', () => {
       join(jobsDir, 'orphan.json'),
       JSON.stringify({
         id: 'orphan',
-        kind: 'review',
+        kind: 'delegate',
         title: 'Stray file',
         summary: 'Should not show up',
         workspaceRoot: '/repo/example',
@@ -70,15 +70,15 @@ describe('jobs operations', () => {
     ).rejects.toThrow(/invalid job id/i);
   });
 
-  it('cancels a detached running rescue job by process group and records the terminal state', async () => {
+  it('cancels a detached running delegate job by process group and records the terminal state', async () => {
     const root = mkdtempSync(join(tmpdir(), 'claude-companion-jobs-'));
     const { createJob, readJob } = await loadStore();
     const { runCancel } = await loadJobs();
     const killSpy = vi.spyOn(process, 'kill').mockReturnValue(true);
 
     const job = await createJob(root, '/repo/example', {
-      kind: 'rescue',
-      title: 'Background rescue',
+      kind: 'delegate',
+      title: 'Background delegate',
       summary: 'Running job',
       status: 'running',
       phase: 'running',
@@ -190,8 +190,8 @@ describe('jobs operations', () => {
     const { runCancel } = await loadJobs();
 
     const job = await createJob(root, '/repo/example', {
-      kind: 'review',
-      title: 'Completed review',
+      kind: 'delegate',
+      title: 'Completed delegate',
       summary: 'All done',
       status: 'completed',
       phase: 'completed',

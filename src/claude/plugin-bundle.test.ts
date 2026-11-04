@@ -10,7 +10,6 @@ describe('claude plugin bundle scaffold', () => {
     expect(existsSync('claude/skills')).toBe(true);
     expect(existsSync('claude/scripts/lib')).toBe(true);
     expect(existsSync('claude/prompts')).toBe(true);
-    expect(existsSync('claude/schemas')).toBe(true);
 
     const manifest = JSON.parse(
       readFileSync('claude/.codex-plugin/plugin.json', 'utf8'),

@@ -20,7 +20,7 @@ function serializeError(error) {
 }
 
 function isDelegationJob(job) {
-  return (job.kind === 'delegate' || job.kind === 'rescue') &&
+  return job.kind === 'delegate' &&
     typeof job.sessionId === 'string' &&
     job.sessionId.length > 0;
 }
@@ -29,19 +29,19 @@ function matchesCodexThread(job, codexThreadId) {
   return codexThreadId == null || job.threadId === codexThreadId;
 }
 
-function latestRescueJob(jobs, codexThreadId = null) {
+function latestDelegateJob(jobs, codexThreadId = null) {
   return [...jobs]
     .filter(isDelegationJob)
     .filter((job) => matchesCodexThread(job, codexThreadId))
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
 }
 
-export function selectRescueSession(jobs, flags, codexThreadId = null) {
+export function selectDelegateSession(jobs, flags, codexThreadId = null) {
   if (flags.fresh || !flags.resume) {
     return null;
   }
 
-  return latestRescueJob(jobs, codexThreadId)?.sessionId ?? null;
+  return latestDelegateJob(jobs, codexThreadId)?.sessionId ?? null;
 }
 
 export function buildResumeHint(jobs, flags, codexThreadId = null) {
@@ -49,14 +49,14 @@ export function buildResumeHint(jobs, flags, codexThreadId = null) {
     return null;
   }
 
-  if (!latestRescueJob(jobs, codexThreadId)) {
+  if (!latestDelegateJob(jobs, codexThreadId)) {
     return null;
   }
 
   return 'Hint: rerun with --resume to continue the latest delegate thread, or --fresh to start a new one.';
 }
 
-function normalizeRescueRuntime(runtimeOrEnv = process.env) {
+function normalizeDelegateRuntime(runtimeOrEnv = process.env) {
   if (
     runtimeOrEnv &&
     typeof runtimeOrEnv === 'object' &&
@@ -76,9 +76,9 @@ function normalizeRescueRuntime(runtimeOrEnv = process.env) {
   };
 }
 
-export async function runRescueCore(parsed, sessionId, runtimeOrEnv = process.env) {
-  const runtime = normalizeRescueRuntime(runtimeOrEnv);
-  const prompt = await readFile(pluginPath('prompts', 'rescue-system.md'), 'utf8');
+export async function runDelegateCore(parsed, sessionId, runtimeOrEnv = process.env) {
+  const runtime = normalizeDelegateRuntime(runtimeOrEnv);
+  const prompt = await readFile(pluginPath('prompts', 'delegate-system.md'), 'utf8');
   const args = [
     '--model',
     parsed.flags.model ?? DEFAULT_MODEL,
@@ -123,17 +123,16 @@ export async function runRescueCore(parsed, sessionId, runtimeOrEnv = process.en
   };
 }
 
-export async function runRescue(parsed, deps) {
+export async function runDelegate(parsed, deps) {
   const jobs = await deps.listJobs(deps.stateRoot, deps.workspaceRoot);
   // Codex injects CODEX_THREAD_ID into shell tool environments; scoping
   // implicit --resume to it keeps two Codex conversations on the same
   // workspace from silently continuing each other's delegate threads.
   const codexThreadId = deps.env?.CODEX_THREAD_ID ?? null;
-  const sessionId = selectRescueSession(jobs, parsed.flags, codexThreadId);
+  const sessionId = selectDelegateSession(jobs, parsed.flags, codexThreadId);
   const resumeHint = buildResumeHint(jobs, parsed.flags, codexThreadId);
-  const jobKind = parsed.command === 'rescue' ? 'rescue' : 'delegate';
-  const job = await deps.createJob(deps.stateRoot, deps.workspaceRoot, {
-    kind: jobKind,
+    const job = await deps.createJob(deps.stateRoot, deps.workspaceRoot, {
+    kind: 'delegate',
     title: 'Claude delegate',
     summary: parsed.trailingText || 'Delegated task',
     status: parsed.flags.background ? 'queued' : 'running',
@@ -175,7 +174,7 @@ export async function runRescue(parsed, deps) {
   }
 
   try {
-    const result = await deps.runRescueCore(parsed, sessionId);
+    const result = await deps.runDelegateCore(parsed, sessionId);
     const updated = await deps.updateJob(deps.stateRoot, deps.workspaceRoot, job.id, {
       status: 'completed',
       phase: 'completed',
@@ -237,8 +236,8 @@ export async function runBackgroundJob(options) {
   });
 
   try {
-    const rescueArgs = {
-      command: storedJob.kind === 'rescue' ? 'rescue' : 'delegate',
+    const delegateArgs = {
+      command: 'delegate',
       flags: {
         background: false,
         resume: Boolean(storedJob.sessionId),
@@ -248,8 +247,8 @@ export async function runBackgroundJob(options) {
       },
       trailingText: storedJob.summary ?? 'Delegated task',
     };
-    const runCore = options.runRescueCore ?? runRescueCore;
-    const result = await runCore(rescueArgs, storedJob.sessionId ?? null, {
+    const runCore = options.runDelegateCore ?? runDelegateCore;
+    const result = await runCore(delegateArgs, storedJob.sessionId ?? null, {
       env: options.env,
       onStdoutChunk: recordProgress,
       onStderrChunk: recordProgress,

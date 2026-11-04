@@ -1,9 +1,15 @@
 import { spawn, spawnSync } from 'node:child_process';
 
-const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
+export const DEFAULT_TIMEOUT_MS = 4 * 60 * 60 * 1000;
+
+// CLAUDE_COMPANION_TIMEOUT_MS overrides the 4-hour limit on one Claude run.
+export function resolveTimeoutMs(env = process.env) {
+  const value = Number(env.CLAUDE_COMPANION_TIMEOUT_MS);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_TIMEOUT_MS;
+}
 
 function formatDuration(ms) {
-  return ms >= 60_000 ? `${Math.round(ms / 60_000)} minutes` : `${Math.round(ms / 1000)} seconds`;
+  return ms >= 3_600_000 && ms % 3_600_000 === 0 ? `${ms / 3_600_000} hours` : ms >= 60_000 ? `${Math.round(ms / 60_000)} minutes` : `${Math.round(ms / 1000)} seconds`;
 }
 
 function killClaude(child) {
@@ -48,7 +54,7 @@ function spawnClaude(args, env) {
 }
 
 async function runClaudeCommand(args, env, hooks = {}, stdinData = '') {
-  const timeoutMs = hooks.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutMs = hooks.timeoutMs ?? resolveTimeoutMs(env);
   return await new Promise((resolve) => {
     const child = spawnClaude(args, env);
 
@@ -94,7 +100,7 @@ async function runClaudeCommand(args, env, hooks = {}, stdinData = '') {
     });
 
     // Input goes over stdin rather than argv: argv has hard per-argument
-    // size limits (~128 KB on Linux) that full review diffs exceed, and stdin
+    // size limits (~128 KB on Linux) that long prompts exceed, and stdin
     // keeps prompts out of process listings. Ignore stdin errors — if the
     // child fails to start, the 'error' handler above reports it.
     child.stdin.on('error', () => {});
@@ -108,7 +114,7 @@ export async function runClaudeJson(prompt, extraArgs = [], env = process.env, h
 
 export function withClaudeVersionHint(message) {
   if (/unknown or unexpected option|unknown option|unrecognized option/i.test(message)) {
-    return `${message}\nYour installed Claude Code likely predates a flag this plugin relies on (such as --effort or --json-schema). Update Claude Code and retry.`;
+    return `${message}\nYour installed Claude Code likely predates a flag this plugin relies on (such as --effort). Update Claude Code and retry.`;
   }
   return message;
 }
@@ -119,107 +125,5 @@ export function parseClaudeEnvelope(stdout) {
     isError: Boolean(parsed.is_error),
     result: String(parsed.result ?? ''),
     sessionId: parsed.session_id,
-  };
-}
-
-function isAuthPrompt(text) {
-  return /(log\s*in|sign\s*in|authenticate|authentication|auth token|token expired|access denied)/i.test(text);
-}
-
-function unavailable(message, sessionId) {
-  return {
-    ok: false,
-    availability: 'unavailable',
-    message,
-    sessionId,
-  };
-}
-
-export async function probeClaude(defaultModel, env = process.env) {
-  const authResult = await runClaudeCommand(['auth', 'status', '--json'], env, { timeoutMs: 30_000 });
-
-  if (authResult.error) {
-    return unavailable(`Claude Code could not be started: ${authResult.error.message}`, undefined);
-  }
-
-  let auth = null;
-  try {
-    auth = JSON.parse(authResult.stdout.trim());
-  } catch {
-    auth = null;
-  }
-
-  if (auth && typeof auth.loggedIn === 'boolean') {
-    if (!auth.loggedIn) {
-      return unavailable(
-        'Claude Code is installed but not signed in. Run `claude` in a terminal, sign in, and retry.',
-        undefined,
-      );
-    }
-
-    return {
-      ok: true,
-      availability: 'ready',
-      message: `Signed in${auth.authMethod ? ` via ${auth.authMethod}` : ''}${auth.email ? ` as ${auth.email}` : ''}.`,
-      sessionId: undefined,
-    };
-  }
-
-  // Older Claude Code versions without `auth status --json`: fall back to a
-  // live prompt probe, which costs one small API call.
-  return await probeClaudeWithPrompt(defaultModel, env);
-}
-
-async function probeClaudeWithPrompt(defaultModel, env) {
-  const commandResult = await runClaudeJson('Reply with READY.', ['--model', defaultModel], env, {
-    timeoutMs: 2 * 60 * 1000,
-  });
-
-  if (commandResult.error) {
-    return unavailable(
-      `Claude Code could not be started: ${commandResult.error.message}`,
-      undefined,
-    );
-  }
-
-  const stdout = commandResult.stdout.trim();
-  const stderr = commandResult.stderr.trim();
-
-  if (commandResult.code !== 0 && stdout === '') {
-    return unavailable(withClaudeVersionHint(stderr) || 'Claude Code failed before returning JSON.', undefined);
-  }
-
-  if (stdout === '') {
-    return unavailable(
-      stderr || 'Claude Code returned no output. Verify the installation and try again.',
-      undefined,
-    );
-  }
-
-  let envelope;
-  try {
-    envelope = parseClaudeEnvelope(stdout);
-  } catch {
-    const combined = `${stdout}\n${stderr}`.trim();
-    const guidance = isAuthPrompt(combined)
-      ? 'Claude Code returned non-JSON output that looks like an authentication prompt. Sign in to Claude Code and retry.'
-      : 'Claude Code returned non-JSON output. Verify the Claude Code installation and retry.';
-    return unavailable(guidance, undefined);
-  }
-
-  if (envelope.isError) {
-    return {
-      ok: false,
-      availability: 'unavailable',
-      message: envelope.result,
-      sessionId: envelope.sessionId,
-    };
-  }
-
-  return {
-    ok: true,
-    availability: 'ready',
-    message: envelope.result,
-    sessionId: envelope.sessionId,
   };
 }

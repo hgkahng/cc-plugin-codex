@@ -2,7 +2,7 @@
 import { cwd } from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { getStateRoot, loadRuntimeConfig } from './lib/runtime-config.mjs';
-import { runBackgroundJob as runBackgroundRescueJob } from './lib/operations/rescue.mjs';
+import { runBackgroundJob as runBackgroundDelegateJob } from './lib/operations/delegate.mjs';
 
 function parseWorkerArgs(argv) {
   const [jobId, ...rest] = argv;
@@ -27,7 +27,7 @@ function parseWorkerArgs(argv) {
 }
 
 export async function runBackgroundJob(options) {
-  return await runBackgroundRescueJob(options);
+  return await runBackgroundDelegateJob(options);
 }
 
 export async function main(argv = process.argv.slice(2)) {
@@ -37,7 +37,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   const config = await loadRuntimeConfig();
-  await runBackgroundRescueJob({
+  await runBackgroundDelegateJob({
     jobId,
     workspaceRoot: cwd(),
     stateRoot: getStateRoot(),

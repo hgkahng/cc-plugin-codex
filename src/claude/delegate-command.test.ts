@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const loadRescue = () => import('../../claude/scripts/lib/operations/rescue.mjs');
+const loadDelegate = () => import('../../claude/scripts/lib/operations/delegate.mjs');
 const loadStore = () => import('../../claude/scripts/lib/jobs-store.mjs');
 const loadWorker = () => import('../../claude/scripts/run-background-job.mjs');
 const loadClaudeProcess = () => import('../../claude/scripts/lib/claude-process.mjs');
@@ -25,16 +25,16 @@ function createFakeClaudeExecutable(body: string) {
   };
 }
 
-describe('rescue operation', () => {
+describe('delegate operation', () => {
   it('defaults delegate core runs to opus with high effort', async () => {
-    const { runRescueCore } = await loadRescue();
+    const { runDelegateCore } = await loadDelegate();
     const argsFile = join(mkdtempSync(join(tmpdir(), 'claude-args-')), 'args.txt');
     const fake = createFakeClaudeExecutable([
       'printf "%s\\n" "$@" > "$CLAUDE_ARGS_FILE"',
       'printf \'{"is_error":false,"result":"delegated","session_id":"session-defaults"}\'',
     ].join('\n'));
 
-    await runRescueCore(
+    await runDelegateCore(
       {
         command: 'delegate',
         flags: {
@@ -86,14 +86,14 @@ describe('rescue operation', () => {
   });
 
   it('spawns a background worker when --background is set and persists a durable logFilePath', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'claude-companion-rescue-'));
-    const { runRescue } = await loadRescue();
+    const root = mkdtempSync(join(tmpdir(), 'claude-companion-delegate-'));
+    const { runDelegate } = await loadDelegate();
     const { createJob, readJob, listJobs, updateJob } = await loadStore();
     const spawnBackgroundWorker = vi.fn(async () => 4242);
 
-    const result = await runRescue(
+    const result = await runDelegate(
       {
-        command: 'rescue',
+        command: 'delegate',
         flags: {
           background: true,
           resume: false,
@@ -127,16 +127,16 @@ describe('rescue operation', () => {
   });
 
   it('stores new delegate jobs under the delegate kind', async () => {
-    const { runRescue } = await loadRescue();
+    const { runDelegate } = await loadDelegate();
     const createJob = vi.fn(async (_root, _workspaceRoot, job) => ({ id: 'job-1', ...job }));
-    const runRescueCore = vi.fn(async () => ({
+    const runDelegateCore = vi.fn(async () => ({
       sessionId: 'session-delegate',
       rawOutput: 'Delegated',
       parsedPayload: { summary: 'Delegated' },
       renderedOutput: 'Delegated',
     }));
 
-    const result = await runRescue(
+    const result = await runDelegate(
       {
         command: 'delegate',
         flags: {
@@ -155,7 +155,7 @@ describe('rescue operation', () => {
         createJob,
         updateJob: vi.fn(async (_root, _workspaceRoot, _jobId, patch) => ({ id: 'job-1', ...patch })),
         listJobs: vi.fn(async () => []),
-        runRescueCore,
+        runDelegateCore,
       },
     );
 
@@ -170,15 +170,15 @@ describe('rescue operation', () => {
     expect(result.output).toContain('Delegated');
   });
 
-  it('reuses the latest delegate or legacy rescue session when --resume is set', async () => {
-    const { selectRescueSession } = await loadRescue();
+  it('reuses the latest delegate or legacy delegate session when --resume is set', async () => {
+    const { selectDelegateSession } = await loadDelegate();
 
-    const session = selectRescueSession(
+    const session = selectDelegateSession(
       [
         { id: 'job-1', kind: 'review', sessionId: 'review-1', createdAt: '2026-03-31T21:00:00.000Z' },
-        { id: 'job-7', kind: 'rescue', sessionId: 'session-7', createdAt: '2026-03-31T23:00:00.000Z' },
+        { id: 'job-7', kind: 'delegate', sessionId: 'session-7', createdAt: '2026-03-31T23:00:00.000Z' },
         { id: 'job-8', kind: 'delegate', sessionId: 'session-8', createdAt: '2026-03-31T23:30:00.000Z' },
-        { id: 'job-3', kind: 'rescue', sessionId: 'session-3', createdAt: '2026-03-31T22:00:00.000Z' },
+        { id: 'job-3', kind: 'delegate', sessionId: 'session-3', createdAt: '2026-03-31T22:00:00.000Z' },
       ],
       { resume: true, fresh: false },
     );
@@ -187,7 +187,7 @@ describe('rescue operation', () => {
   });
 
   it('scopes implicit --resume to the current Codex thread when a thread id is available', async () => {
-    const { selectRescueSession } = await loadRescue();
+    const { selectDelegateSession } = await loadDelegate();
     const jobs = [
       {
         id: 'job-other',
@@ -205,16 +205,16 @@ describe('rescue operation', () => {
       },
     ];
 
-    expect(selectRescueSession(jobs, { resume: true, fresh: false }, 'codex-thread-mine')).toBe('session-mine');
-    expect(selectRescueSession(jobs, { resume: true, fresh: false }, 'codex-thread-unknown')).toBeNull();
-    expect(selectRescueSession(jobs, { resume: true, fresh: false }, null)).toBe('session-other-window');
+    expect(selectDelegateSession(jobs, { resume: true, fresh: false }, 'codex-thread-mine')).toBe('session-mine');
+    expect(selectDelegateSession(jobs, { resume: true, fresh: false }, 'codex-thread-unknown')).toBeNull();
+    expect(selectDelegateSession(jobs, { resume: true, fresh: false }, null)).toBe('session-other-window');
   });
 
   it('records the Codex thread id on new delegate jobs when the environment provides one', async () => {
-    const { runRescue } = await loadRescue();
+    const { runDelegate } = await loadDelegate();
     const createJob = vi.fn(async (_root, _workspaceRoot, job) => ({ id: 'job-1', ...job }));
 
-    await runRescue(
+    await runDelegate(
       {
         command: 'delegate',
         flags: {
@@ -234,7 +234,7 @@ describe('rescue operation', () => {
         createJob,
         updateJob: vi.fn(async (_root, _workspaceRoot, _jobId, patch) => ({ id: 'job-1', ...patch })),
         listJobs: vi.fn(async () => []),
-        runRescueCore: vi.fn(async () => ({
+        runDelegateCore: vi.fn(async () => ({
           sessionId: 'session-new',
           rawOutput: 'Done',
           parsedPayload: { summary: 'Done' },
@@ -250,18 +250,18 @@ describe('rescue operation', () => {
     );
   });
 
-  it('surfaces a concise resume hint when a prior rescue session exists and no routing flag is passed', async () => {
-    const { runRescue } = await loadRescue();
-    const runRescueCore = vi.fn(async () => ({
+  it('surfaces a concise resume hint when a prior delegate session exists and no routing flag is passed', async () => {
+    const { runDelegate } = await loadDelegate();
+    const runDelegateCore = vi.fn(async () => ({
       sessionId: 'session-new',
       rawOutput: 'Done',
       parsedPayload: { summary: 'Done' },
       renderedOutput: 'Done',
     }));
 
-    const result = await runRescue(
+    const result = await runDelegate(
       {
-        command: 'rescue',
+        command: 'delegate',
         flags: {
           background: false,
           resume: false,
@@ -280,36 +280,36 @@ describe('rescue operation', () => {
         listJobs: vi.fn(async () => [
           {
             id: 'job-9',
-            kind: 'rescue',
-            summary: 'Previous rescue',
+            kind: 'delegate',
+            summary: 'Previous delegate',
             sessionId: 'session-9',
             createdAt: '2026-03-31T23:00:00.000Z',
           },
         ]),
-        runRescueCore,
+        runDelegateCore,
       },
     );
 
-    expect(runRescueCore).toHaveBeenCalledWith(expect.anything(), null);
+    expect(runDelegateCore).toHaveBeenCalledWith(expect.anything(), null);
     expect(result.output).toContain('Done');
     expect(result.output).toContain('--resume');
     expect(result.output).toContain('--fresh');
   });
 
-  it('completes a persisted rescue job from the background worker entrypoint', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'claude-companion-rescue-'));
+  it('completes a persisted delegate job from the background worker entrypoint', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'claude-companion-delegate-'));
     const { createJob, readJob } = await loadStore();
     const { runBackgroundJob } = await loadWorker();
-    const runRescueCore = vi.fn(async () => ({
+    const runDelegateCore = vi.fn(async () => ({
       sessionId: 'session-42',
-      rawOutput: 'Background rescue finished',
-      parsedPayload: { summary: 'Background rescue finished' },
-      renderedOutput: 'Background rescue finished',
+      rawOutput: 'Background delegate finished',
+      parsedPayload: { summary: 'Background delegate finished' },
+      renderedOutput: 'Background delegate finished',
     }));
 
     const job = await createJob(root, '/repo/example', {
-      kind: 'rescue',
-      title: 'Claude rescue',
+      kind: 'delegate',
+      title: 'Claude delegate',
       summary: 'Investigate flaky retries',
       status: 'running',
       phase: 'running',
@@ -323,11 +323,11 @@ describe('rescue operation', () => {
       stateRoot: root,
       config: { defaultModel: 'sonnet', defaultEffort: 'medium' },
       log: vi.fn(),
-      runRescueCore,
+      runDelegateCore,
     });
 
     const stored = await readJob(root, '/repo/example', job.id);
-    expect(runRescueCore).toHaveBeenCalledWith(
+    expect(runDelegateCore).toHaveBeenCalledWith(
       expect.objectContaining({
         flags: expect.objectContaining({ model: 'sonnet', effort: 'medium' }),
         trailingText: 'Investigate flaky retries',
@@ -341,30 +341,30 @@ describe('rescue operation', () => {
     expect(stored.status).toBe('completed');
     expect(stored.phase).toBe('completed');
     expect(stored.sessionId).toBe('session-42');
-    expect(stored.renderedOutput).toBe('Background rescue finished');
+    expect(stored.renderedOutput).toBe('Background delegate finished');
   });
 
-  it('passes streaming sinks into rescue core and persists a running snapshot before completion', async () => {
+  it('passes streaming sinks into delegate core and persists a running snapshot before completion', async () => {
     const { runBackgroundJob } = await loadWorker();
     const log = vi.fn();
     const updateJob = vi.fn(async (_stateRoot, _workspaceRoot, _jobId, patch) => ({ id: 'job-1', ...patch }));
     const readJob = vi.fn(async () => ({
       id: 'job-1',
-      kind: 'rescue',
-      title: 'Claude rescue',
+      kind: 'delegate',
+      title: 'Claude delegate',
       summary: 'Investigate flaky retries',
       status: 'running',
       phase: 'running',
       sessionId: 'session-prior',
     }));
-    const runRescueCore = vi.fn(async (_parsed, _sessionId, runtime) => {
+    const runDelegateCore = vi.fn(async (_parsed, _sessionId, runtime) => {
       runtime?.onStdoutChunk?.('step 1\n');
       runtime?.onStderrChunk?.('step 2\n');
       return {
         sessionId: 'session-next',
-        rawOutput: 'Background rescue finished',
-        parsedPayload: { summary: 'Background rescue finished' },
-        renderedOutput: 'Background rescue finished',
+        rawOutput: 'Background delegate finished',
+        parsedPayload: { summary: 'Background delegate finished' },
+        renderedOutput: 'Background delegate finished',
       };
     });
 
@@ -376,10 +376,10 @@ describe('rescue operation', () => {
       log,
       readJob,
       updateJob,
-      runRescueCore,
+      runDelegateCore,
     });
 
-    expect(runRescueCore).toHaveBeenCalledWith(
+    expect(runDelegateCore).toHaveBeenCalledWith(
       expect.anything(),
       'session-prior',
       expect.objectContaining({
@@ -410,14 +410,14 @@ describe('rescue operation', () => {
     );
   });
 
-  it('does not let a later background completion overwrite a cancelled rescue job', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'claude-companion-rescue-'));
+  it('does not let a later background completion overwrite a cancelled delegate job', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'claude-companion-delegate-'));
     const { createJob, readJob, updateJob } = await loadStore();
     const { runBackgroundJob } = await loadWorker();
 
     const job = await createJob(root, '/repo/example', {
-      kind: 'rescue',
-      title: 'Claude rescue',
+      kind: 'delegate',
+      title: 'Claude delegate',
       summary: 'Investigate flaky retries',
       status: 'running',
       phase: 'running',
@@ -433,7 +433,7 @@ describe('rescue operation', () => {
       config: { defaultModel: 'sonnet', defaultEffort: 'medium' },
       log: vi.fn(),
       updateJob,
-      runRescueCore: async (_parsed, _sessionId, runtime) => {
+      runDelegateCore: async (_parsed, _sessionId, runtime) => {
         runtime?.onStdoutChunk?.('step 1\n');
         await updateJob(root, '/repo/example', job.id, {
           status: 'cancelled',
@@ -444,9 +444,9 @@ describe('rescue operation', () => {
 
         return {
           sessionId: 'session-next',
-          rawOutput: 'Background rescue finished',
-          parsedPayload: { summary: 'Background rescue finished' },
-          renderedOutput: 'Background rescue finished',
+          rawOutput: 'Background delegate finished',
+          parsedPayload: { summary: 'Background delegate finished' },
+          renderedOutput: 'Background delegate finished',
         };
       },
     });
@@ -455,7 +455,7 @@ describe('rescue operation', () => {
     expect(stored.status).toBe('cancelled');
     expect(stored.phase).toBe('cancelled');
     expect(stored.pid).toBeNull();
-    expect(stored.renderedOutput).not.toBe('Background rescue finished');
+    expect(stored.renderedOutput).not.toBe('Background delegate finished');
     expect(stored.sessionId).toBe('session-prior');
   });
 
@@ -471,20 +471,20 @@ describe('rescue operation', () => {
     });
     const readJob = vi.fn(async () => ({
       id: 'job-1',
-      kind: 'rescue',
-      title: 'Claude rescue',
+      kind: 'delegate',
+      title: 'Claude delegate',
       summary: 'Investigate flaky retries',
       status: 'running',
       phase: 'running',
       sessionId: 'session-prior',
     }));
-    const runRescueCore = vi.fn(async (_parsed, _sessionId, runtime) => {
+    const runDelegateCore = vi.fn(async (_parsed, _sessionId, runtime) => {
       runtime?.onStdoutChunk?.('step 1\n');
       return {
         sessionId: 'session-next',
-        rawOutput: 'Background rescue finished',
-        parsedPayload: { summary: 'Background rescue finished' },
-        renderedOutput: 'Background rescue finished',
+        rawOutput: 'Background delegate finished',
+        parsedPayload: { summary: 'Background delegate finished' },
+        renderedOutput: 'Background delegate finished',
       };
     });
     const unhandled: unknown[] = [];
@@ -502,7 +502,7 @@ describe('rescue operation', () => {
         log,
         readJob,
         updateJob,
-        runRescueCore,
+        runDelegateCore,
       });
 
       await new Promise((resolve) => setTimeout(resolve, 0));
