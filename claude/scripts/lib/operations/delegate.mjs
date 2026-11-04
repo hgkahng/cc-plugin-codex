@@ -53,7 +53,7 @@ export function buildResumeHint(jobs, flags, codexThreadId = null) {
     return null;
   }
 
-  return 'Hint: rerun with --resume to continue the latest delegate thread, or --fresh to start a new one.';
+  return 'Hint: rerun with --resume to continue the latest Claude session, or --fresh to start a new one.';
 }
 
 function normalizeDelegateRuntime(runtimeOrEnv = process.env) {
@@ -125,9 +125,9 @@ export async function runDelegateCore(parsed, sessionId, runtimeOrEnv = process.
 
 export async function runDelegate(parsed, deps) {
   const jobs = await deps.listJobs(deps.stateRoot, deps.workspaceRoot);
-  // Codex injects CODEX_THREAD_ID into shell tool environments; scoping
-  // implicit --resume to it keeps two Codex conversations on the same
-  // workspace from silently continuing each other's delegate threads.
+  // Codex sets CODEX_THREAD_ID in shell tool environments. Matching --resume
+  // to it stops two Codex conversations in one workspace from continuing
+  // each other's Claude sessions.
   const codexThreadId = deps.env?.CODEX_THREAD_ID ?? null;
   const sessionId = selectDelegateSession(jobs, parsed.flags, codexThreadId);
   const resumeHint = buildResumeHint(jobs, parsed.flags, codexThreadId);

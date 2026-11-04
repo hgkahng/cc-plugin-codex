@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-describe('claude plugin bundle scaffold', () => {
+describe('claude plugin bundle', () => {
   it('keeps the publishable bundle rooted under claude/', () => {
     expect(existsSync('claude/.codex-plugin/plugin.json')).toBe(true);
     expect(existsSync('claude/assets/claude-small.svg')).toBe(true);

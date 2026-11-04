@@ -93,7 +93,7 @@ async function pruneUnindexedJobs(stateRoot, workspaceRoot, keepIds) {
         continue;
       }
     } catch {
-      // Unreadable job files are stale garbage; fall through and delete.
+      // An unreadable job file is stale, so delete it.
     }
 
     await rm(join(jobsDir, entry), { force: true });

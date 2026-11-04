@@ -170,7 +170,7 @@ describe('delegate operation', () => {
     expect(result.output).toContain('Delegated');
   });
 
-  it('reuses the latest delegate or legacy delegate session when --resume is set', async () => {
+  it('reuses the latest delegate session when --resume is set', async () => {
     const { selectDelegateSession } = await loadDelegate();
 
     const session = selectDelegateSession(
@@ -250,7 +250,7 @@ describe('delegate operation', () => {
     );
   });
 
-  it('surfaces a concise resume hint when a prior delegate session exists and no routing flag is passed', async () => {
+  it('shows a resume hint when a prior delegate session exists and no routing flag is passed', async () => {
     const { runDelegate } = await loadDelegate();
     const runDelegateCore = vi.fn(async () => ({
       sessionId: 'session-new',

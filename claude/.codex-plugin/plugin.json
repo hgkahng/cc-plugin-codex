@@ -1,7 +1,7 @@
 {
   "name": "claude-companion",
-  "version": "0.2.0",
-  "description": "Codex-native Claude Code delegation companion.",
+  "version": "0.2.1",
+  "description": "Delegate tasks from Codex to Claude Code.",
   "author": {
     "name": "Pejman Pour-Moezzi",
     "url": "https://github.com/pejmanjohn"
@@ -18,7 +18,7 @@
   "interface": {
     "displayName": "Claude Companion",
     "shortDescription": "Delegate tasks to Claude Code from Codex, in the foreground or background.",
-    "longDescription": "Hands implementation and investigation tasks to your local Claude Code, with background jobs you can check, read, and cancel.",
+    "longDescription": "Sends implementation and investigation tasks to your local Claude Code. You can check, read, and cancel background jobs.",
     "developerName": "Pejman Pour-Moezzi",
     "category": "Coding",
     "capabilities": [

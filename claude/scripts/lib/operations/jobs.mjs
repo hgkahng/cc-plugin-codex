@@ -59,7 +59,7 @@ async function reconcileDeadWorker(deps, job) {
     pid: null,
     processGroupId: null,
     error: {
-      message: 'Background worker process is no longer running; the job was marked failed during status reconciliation.',
+      message: 'Background worker process is no longer running, so status marked the job failed.',
     },
   });
 }

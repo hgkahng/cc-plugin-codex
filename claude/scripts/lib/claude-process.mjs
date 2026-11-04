@@ -65,7 +65,7 @@ async function runClaudeCommand(args, env, hooks = {}, stdinData = '') {
 
     const timeoutTimer = setTimeout(() => {
       timeoutError = new Error(
-        `Claude Code run timed out after ${formatDuration(timeoutMs)} and was terminated.`,
+        `Claude Code timed out after ${formatDuration(timeoutMs)}, so the plugin stopped it.`,
       );
       killClaude(child);
     }, timeoutMs);
@@ -101,7 +101,7 @@ async function runClaudeCommand(args, env, hooks = {}, stdinData = '') {
 
     // Input goes over stdin rather than argv: argv has hard per-argument
     // size limits (~128 KB on Linux) that long prompts exceed, and stdin
-    // keeps prompts out of process listings. Ignore stdin errors — if the
+    // keeps prompts out of process listings. Stdin errors are ignored. If the
     // child fails to start, the 'error' handler above reports it.
     child.stdin.on('error', () => {});
     child.stdin.end(stdinData);

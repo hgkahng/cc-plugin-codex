@@ -8,8 +8,8 @@ const skills = new Map([
   ['claude-cancel', 'cancel'],
 ]);
 
-describe('claude skill surface', () => {
-  it('ships thin bundled skills that shell into the shared runtime', () => {
+describe('claude skills', () => {
+  it('ships skills that only run the shared entrypoint script', () => {
     for (const [skill, command] of skills) {
       const path = `claude/skills/${skill}/SKILL.md`;
       expect(existsSync(path)).toBe(true);
@@ -17,7 +17,7 @@ describe('claude skill surface', () => {
       expect(contents).toContain('directory two levels above this `SKILL.md` file');
       expect(contents).toContain(`node <plugin-root>/scripts/claude-companion.mjs ${command}`);
       expect(contents).not.toContain('node claude/scripts/claude-companion.mjs');
-      expect(contents).toContain('Do not implement logic in this skill');
+      expect(contents).toContain("Do not do the command's work yourself.");
     }
   });
 });

@@ -101,7 +101,7 @@ describe('jobs operations', () => {
     killSpy.mockRestore();
   });
 
-  it('reports a still-running job honestly from runResult', async () => {
+  it('reports a still-running job from runResult', async () => {
     const root = mkdtempSync(join(tmpdir(), 'claude-companion-jobs-'));
     const { createJob } = await loadStore();
     const { runResult } = await loadJobs();

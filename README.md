@@ -28,7 +28,19 @@ codex plugin add claude-companion@cc-plugin-codex-marketplace
 
 Restart Codex (or the Codex app), then start a new thread.
 
-To update, run `codex plugin marketplace upgrade cc-plugin-codex-marketplace`, repeat `codex plugin add`, and start a new thread. To uninstall, run `codex plugin remove claude-companion@cc-plugin-codex-marketplace` and `codex plugin marketplace remove cc-plugin-codex-marketplace`.
+To update, run these and start a new thread:
+
+```bash
+codex plugin marketplace upgrade cc-plugin-codex-marketplace
+codex plugin add claude-companion@cc-plugin-codex-marketplace
+```
+
+To uninstall:
+
+```bash
+codex plugin remove claude-companion@cc-plugin-codex-marketplace
+codex plugin marketplace remove cc-plugin-codex-marketplace
+```
 
 ## Delegate
 
@@ -61,7 +73,9 @@ Each run is `claude -p --output-format json` in the current workspace. Claude lo
 
 ## If Codex blocks the delegate command
 
-Codex may refuse to run it as "delegating repository context to an external service". The command runs your own `claude` under your own Anthropic account, the same as running `claude` in a terminal. The decision belongs to Codex's approval layer. The plugin rejects unknown flags, so a command where Codex added a flag such as `--dangerously-skip-permissions` fails; retry the skill.
+Codex may refuse to run it as "delegating repository context to an external service". The command runs your own `claude` under your own Anthropic account, the same as running `claude` in a terminal. Codex's approval layer makes that decision, not the plugin.
+
+Codex sometimes adds a flag such as `--dangerously-skip-permissions` to the command. The plugin rejects unknown flags, so that command fails. Retry the skill.
 
 ## Development
 
